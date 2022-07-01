@@ -51,6 +51,11 @@ export class IfcManager {
         );
     }
 
+    createModelForExport()
+    {
+        this.ifcLoader.ifcManager.createModelForExport();
+    }
+
     async dispose() {
         this.ifcModels.length = 0;
         await this.ifcLoader.ifcManager.dispose();
