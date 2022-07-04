@@ -135,6 +135,24 @@ export class ExportHelper {
         return ref(ID);
     }
 
+    async SurfaceStyleRendering(r: number, g: number, b: number, a: number): Promise<any> {
+        let ID = EID++;
+        let col = new wifc.IfcSurfaceStyleRendering(ID,
+            wifc.IFCSURFACESTYLERENDERING,
+            await this.ColourRGB(r, g, b),
+            real(a),
+            empty(),
+            empty(),
+            empty(),
+            empty(),
+            empty(),
+            empty(),
+            enm("NOTDEFINED")
+        );
+        this.Write(col);
+        return ref(ID);
+    }
+
     async SurfaceStyle(name: string, r: number, g: number, b: number, a: number): Promise<any> {
         let ID = EID++;
         let col = new wifc.IfcSurfaceStyle(ID,
@@ -157,6 +175,28 @@ export class ExportHelper {
         return ref(ID);
     }
 
+    async ShapePresentationStyleAssignment(name: string, r: number, g: number, b: number, a: number): Promise<any> {
+        let ID = EID++;
+        let style = new wifc.IfcPresentationStyleAssignment(ID,
+            wifc.IFCPRESENTATIONSTYLEASSIGNMENT,
+            [await this.ShapeStyleAssignment(name, r, g, b, a)]
+        );
+        this.Write(style);
+        return ref(ID);
+    }
+
+    async ShapeStyleAssignment(name: string, r: number, g: number, b: number, a: number): Promise<any> {
+        let ID = EID++;
+        let style = new wifc.IfcSurfaceStyle(ID,
+            wifc.IFCSURFACESTYLE,
+            str(name),
+            enm("BOTH"),
+            [await this.SurfaceStyleRendering(r, g, b, a)]
+        );
+        this.Write(style);
+        return ref(ID);
+    }
+
     async StyledItem(item: any, style: any): Promise<any> {
         let ID = EID++;
         let s = new wifc.IfcStyledItem(ID,
@@ -164,6 +204,31 @@ export class ExportHelper {
             item,
             [style],
             empty()
+        );
+        this.Write(s);
+        return ref(ID);
+    }
+
+    async StyledItemContext(style: any): Promise<any> {
+        let ID = EID++;
+        let s = new wifc.IfcStyledItem(ID,
+            wifc.IFCSTYLEDITEM,
+            empty(),
+            [style],
+            empty()
+        );
+        this.Write(s);
+        return ref(ID);
+    }
+
+    async StyledRepresentationContext(context: any, name: string, description: string ,style: any): Promise<any> {
+        let ID = EID++;
+        let s = new wifc.IfcStyledRepresentation(ID,
+            wifc.IFCSTYLEDREPRESENTATION,
+            context,
+            str(name),
+            str(description),
+            style
         );
         this.Write(s);
         return ref(ID);
@@ -363,7 +428,7 @@ export class ExportHelper {
         return ref(ID);
     }
 
-    async Project(name: string, description: string): Promise<any> {
+    async Project(context: any, name: string, description: string): Promise<any> {
         let ID = EID++;
         let pt = new wifc.IfcProject(ID,
             wifc.IFCPROJECT,
@@ -374,14 +439,30 @@ export class ExportHelper {
             empty(),
             empty(),
             empty(),
-            [],
+            [context],
             await this.UnitAssignment()
         );
         this.Write(pt);
         return ref(ID);
     }
 
-    async UnitAssignment(){
+    async RepresentationContext(pos: any, north: any)
+    {
+        let ID = EID++;
+        let pt = new wifc.IfcGeometricRepresentationContext(ID,
+            wifc.IFCGEOMETRICREPRESENTATIONCONTEXT,
+            str("Model"),
+            empty(),
+            real(3),
+            real(1e-5),
+            await this.AxisPlacement(pos),
+            await this.Dir(north)
+        );
+        this.Write(pt);
+        return ref(ID);
+    }
+
+    async UnitAssignment() {
         let ID = EID++;
         let lst: any = []
         lst.push(await this.SiUnit(enm(wifc.IfcUnitEnum.LENGTHUNIT), enm(wifc.IfcSIUnitName.METRE)))
@@ -400,7 +481,7 @@ export class ExportHelper {
         return ref(ID);
     }
 
-    async SiUnit(unit: any, name: any){
+    async SiUnit(unit: any, name: any) {
         let ID = EID++;
         let pt = new wifc.IfcSIUnit(ID,
             wifc.IFCSIUNIT,

@@ -2,9 +2,9 @@ import { BoxGeometry, BufferGeometry, Material, Mesh, MeshBasicMaterial, Object3
 import * as WebIFC from 'web-ifc';
 
 export interface ExportObject {
-    geometry: any,
-    material: Material,
+    geometries: any[],
+    geometryMaterials: Material[],
     ifcElementType: any,
     ifcElementId: number,
-    placement: Vector3
+    placement: Vector3,
 }

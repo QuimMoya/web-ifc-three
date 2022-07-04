@@ -57,63 +57,74 @@ export class IFCManager {
         return model;
     }
 
-    async exportMeshAsIFCProduct(exporter: ExportHelper, mesh: Mesh, ifcElement: any, ifcId: any, objectPlacement: Vector3): Promise<any> {
-        let geom = mesh.geometry;
+    async exportMeshAsIFCProduct(exporter: ExportHelper, mesh: any[], ifcElement: any, ifcId: any, objectPlacement: Vector3): Promise<any> {
 
-        //@ts-ignore
-        let index = geom.getIndex().array;
-        //@ts-ignore
-        let position = geom.attributes.position.array;
-
-        let posStride = geom.attributes.position.itemSize;
-
-        let faces = [];
-        for (let i = 0; i < index.length; i += 3) {
-            let ia = index[i + 0];
-            let ib = index[i + 1];
-            let ic = index[i + 2];
-
-            let pta: pt = { x: position[ia * posStride + 0], y: position[ia * posStride + 1], z: position[ia * posStride + 2] }
-            let ptb: pt = { x: position[ib * posStride + 0], y: position[ib * posStride + 1], z: position[ib * posStride + 2] }
-            let ptc: pt = { x: position[ic * posStride + 0], y: position[ic * posStride + 1], z: position[ic * posStride + 2] }
+        let brepShapeList: any = [];
+        for (let k = 0; k < mesh.length; k++) {
+            let geom = mesh[k].geometry;
             //@ts-ignore
-            faces.push(await exporter.Face([pta, ptb, ptc]));
+            let index = geom.getIndex().array;
+            //@ts-ignore
+            let position = geom.attributes.position.array;
+
+            let posStride = geom.attributes.position.itemSize;
+
+            let faces = [];
+            for (let i = 0; i < index.length; i += 3) {
+                let ia = index[i + 0];
+                let ib = index[i + 1];
+                let ic = index[i + 2];
+
+                let pta: pt = { x: position[ia * posStride + 0], y: position[ia * posStride + 1], z: position[ia * posStride + 2] }
+                let ptb: pt = { x: position[ib * posStride + 0], y: position[ib * posStride + 1], z: position[ib * posStride + 2] }
+                let ptc: pt = { x: position[ic * posStride + 0], y: position[ic * posStride + 1], z: position[ic * posStride + 2] }
+                //@ts-ignore
+                faces.push(await exporter.Face([pta, ptb, ptc]));
+            }
+
+            let brep = await exporter.FacetedBREP(faces);
+            let brepShape = await exporter.ShapeBREP([brep]);
+
+            //Crear assignació de material per a la geometria
+            if (mesh[k].material) {
+                //@ts-ignore
+                let col = mesh[k].material.color as THREE.Color;
+                //@ts-ignore
+                let opacity = mesh[k].material.opacity as number;
+
+                if (col) {
+                    let style = await exporter.ShapePresentationStyleAssignment("material", col.r, col.g, col.b, 1 - opacity);
+                    await exporter.StyledItem(brep, style);
+                }
+            }
+
+            brepShapeList.push(brepShape);
         }
 
-        let brep = await exporter.FacetedBREP(faces);
-        let brepShape = await exporter.ShapeBREP([brep]);
-        let productDef = await exporter.ProductDefinitionShape([brepShape]);
+        let productDef = await exporter.ProductDefinitionShape(brepShapeList);
         let placement = await exporter.Placement({ x: objectPlacement.x, y: objectPlacement.y, z: objectPlacement.z });
         let element = await exporter.Product(ifcElement, ifcId, productDef, placement);
-
-        // apply material if exists
-        if (mesh.material) {
-            //@ts-ignore
-            let col = mesh.material.color as THREE.Color;
-            //@ts-ignore
-            let opacity = mesh.material.opacity as number;
-
-            if (col) {
-                let style = await exporter.PresentationStyleAssignment("material", col.r, col.g, col.b, 1 - opacity);
-                await exporter.StyledItem(element, style);
-            }
-        }
 
         return element;
     }
 
-    async createModelForExport(projectPlacement: Vector3, objects: ExportObject[]) {
+    async createModelForExport(projectPlacement: Vector3, north: Vector3,  objects: ExportObject[]) {
         if (this.state.api.wasmModule === undefined) await this.state.api.Init();
         console.log("Exporting model...");
 
         let model = await this.state.api.CreateModel();
         let exporter = new ExportHelper(model, this.state.api);
-        let project = await exporter.Project("web-ifc-three", "this project was exported from web-ifc-three");
+        let context = await exporter.RepresentationContext(projectPlacement, north)
+        let project = await exporter.Project(context, "web-ifc-three", "this project was exported from web-ifc-three");
 
         const elementsList: any = [];
         for (let i = 0; i < objects.length; i++) {
-            var mesh = new Mesh(objects[i].geometry, objects[i].material);
-            const ifcElement = await this.exportMeshAsIFCProduct(exporter, mesh, objects[i].ifcElementType, objects[i].ifcElementId, objects[i].placement);
+            var meshList: any = [];
+            for (let j = 0; j < objects[i].geometries.length; j++) {
+                var mesh = new Mesh(objects[i].geometries[j], objects[i].geometryMaterials[j]);
+                meshList.push(mesh);
+            }
+            const ifcElement = await this.exportMeshAsIFCProduct(exporter, meshList, objects[i].ifcElementType, objects[i].ifcElementId, objects[i].placement);
             elementsList.push(ifcElement);
         }
 
