@@ -1,11 +1,12 @@
 import * as WebIFC from 'web-ifc';
+import { ExportObject } from './subsets/ExportObject';
 import { IFCParser, ParserAPI, ParserProgress } from './IFCParser';
 import { SubsetManager } from './subsets/SubsetManager';
 import { PropertyManager } from './properties/PropertyManager';
 import { IfcElements } from './IFCElementsMap';
 import { TypeManager } from './TypeManager';
 import { SubsetConfig, IfcState, JSONObject } from '../BaseDefinitions';
-import { BoxGeometry, BufferGeometry, Material, Mesh, MeshBasicMaterial, Object3D, CylinderGeometry, RingGeometry, Scene } from 'three';
+import { BoxGeometry, BufferGeometry, Material, Mesh, MeshBasicMaterial, Object3D, CylinderGeometry, RingGeometry, Scene, Vector3 } from 'three';
 import { IFCModel } from './IFCModel';
 import { BvhManager } from './BvhManager';
 import { IFCBUILDING, IFCBUILDINGSTOREY, IFCRELAGGREGATES, IFCRELCONTAINEDINSPATIALSTRUCTURE, IFCSITE, IFCWALL, IfcWall, LoaderSettings } from 'web-ifc';
@@ -16,7 +17,6 @@ import { IFCUtils } from './IFCUtils';
 import { Data } from './sequence/Data'
 import { IfcTypesMap } from './IfcTypesMap';
 import { ExportHelper, pt } from './ExportHelper';
-
 
 /**
  * Contains all the logic to work with the loaded IFC files (select, edit, etc).
@@ -57,7 +57,7 @@ export class IFCManager {
         return model;
     }
 
-    async exportMeshAsIFCProduct(exporter: ExportHelper, mesh: Mesh): Promise<any> {
+    async exportMeshAsIFCProduct(exporter: ExportHelper, mesh: Mesh, ifcElement: any, ifcId: any, objectPlacement: Vector3): Promise<any> {
         let geom = mesh.geometry;
 
         //@ts-ignore
@@ -83,8 +83,8 @@ export class IFCManager {
         let brep = await exporter.FacetedBREP(faces);
         let brepShape = await exporter.ShapeBREP([brep]);
         let productDef = await exporter.ProductDefinitionShape([brepShape]);
-        let placement = await exporter.Placement({ x: 0, y: 0, z: 0 });
-        let wall = await exporter.Product(IfcWall, IFCWALL, productDef, placement);
+        let placement = await exporter.Placement({ x: objectPlacement.x, y: objectPlacement.y, z: objectPlacement.z });
+        let element = await exporter.Product(ifcElement, ifcId, productDef, placement);
 
         // apply material if exists
         if (mesh.material) {
@@ -95,39 +95,29 @@ export class IFCManager {
 
             if (col) {
                 let style = await exporter.PresentationStyleAssignment("material", col.r, col.g, col.b, 1 - opacity);
-                await exporter.StyledItem(wall, style);
+                await exporter.StyledItem(element, style);
             }
         }
 
-        return wall;
+        return element;
     }
 
-    async createModelForExport() {
+    async createModelForExport(projectPlacement: Vector3, objects: ExportObject[]) {
         if (this.state.api.wasmModule === undefined) await this.state.api.Init();
         console.log("Exporting model...");
 
         let model = await this.state.api.CreateModel();
-
-        //var cube = new RingGeometry(1, 2, 10, 10);
-        //var cube = new BoxGeometry(10, 10, 10);
-        var cube = new CylinderGeometry(10, 10, 10);
-        var material = new MeshBasicMaterial({
-            color: "red",
-            opacity: 1,
-            wireframe: true,
-            transparent: false
-        });
-        var mesh = new Mesh(cube, material);
-
         let exporter = new ExportHelper(model, this.state.api);
-
         let project = await exporter.Project("web-ifc-three", "this project was exported from web-ifc-three");
 
-        const wall = await this.exportMeshAsIFCProduct(exporter, mesh);
-
-        let placement = await exporter.Placement({ x: 0, y: 0, z: 0 });
         const elementsList: any = [];
-        elementsList.push(wall);
+        for (let i = 0; i < objects.length; i++) {
+            var mesh = new Mesh(objects[i].geometry, objects[i].material);
+            const ifcElement = await this.exportMeshAsIFCProduct(exporter, mesh, objects[i].ifcElementType, objects[i].ifcElementId, objects[i].placement);
+            elementsList.push(ifcElement);
+        }
+
+        let placement = await exporter.Placement({ x: projectPlacement.x, y: projectPlacement.y, z: projectPlacement.z });
         let buildingStorey = await exporter.BuildingStorey(IFCBUILDINGSTOREY, placement);
         let building = await exporter.Building(IFCBUILDING, placement);
         let site = await exporter.Site(IFCSITE, placement);
