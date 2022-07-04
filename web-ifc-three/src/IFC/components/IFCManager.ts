@@ -39,6 +39,8 @@ export class IFCManager {
     private types = new TypeManager(this.state);
     private cleaner = new MemoryCleaner(this.state);
     private worker?: IFCWorkerHandler;
+    private styleList: any = [];
+    private uuidList: any = [];
 
     /**
      * Returns the underlying web-ifc API.
@@ -87,14 +89,30 @@ export class IFCManager {
 
             //Crear assignació de material per a la geometria
             if (mesh[k].material) {
-                //@ts-ignore
-                let col = mesh[k].material.color as THREE.Color;
-                //@ts-ignore
-                let opacity = mesh[k].material.opacity as number;
+                let uuid = mesh[k].material.uuid;
+                let preexistantMaterial = -1;
+                for (let i = 0; i < this.uuidList.length; i++) {
+                    if (this.uuidList[i] == uuid) {
+                        preexistantMaterial = i;
+                    }
+                }
 
-                if (col) {
-                    let style = await exporter.ShapePresentationStyleAssignment("material", col.r, col.g, col.b, 1 - opacity);
-                    await exporter.StyledItem(brep, style);
+                if (preexistantMaterial == -1) {
+                    //@ts-ignore
+                    let col = mesh[k].material.color as THREE.Color;
+                    //@ts-ignore
+                    let opacity = mesh[k].material.opacity as number;
+
+                    if (col) {
+                        let style = await exporter.ShapePresentationStyleAssignment("material", col.r, col.g, col.b, 1 - opacity);
+                        this.uuidList.push(uuid);
+                        this.styleList.push(style);
+                        await exporter.StyledItem(brep, style);
+                    }
+                }
+                else
+                {
+                    await exporter.StyledItem(brep, this.styleList[preexistantMaterial]);
                 }
             }
 
