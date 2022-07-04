@@ -108,14 +108,19 @@ export class IFCManager {
         return element;
     }
 
-    async createModelForExport(projectPlacement: Vector3, north: Vector3,  objects: ExportObject[]) {
+    async createModelForExport(projectPlacement: Vector3, north: Vector3, objects: ExportObject[]) {
         if (this.state.api.wasmModule === undefined) await this.state.api.Init();
         console.log("Exporting model...");
 
         let model = await this.state.api.CreateModel();
         let exporter = new ExportHelper(model, this.state.api);
         let context = await exporter.RepresentationContext(projectPlacement, north)
+        let subContext1 = await exporter.RepresentationSubContext(context, "Axis", "Model", "GRAPH_VIEW")
+        let subContext2 = await exporter.RepresentationSubContext(context, "Body", "Model", "MODEL_VIEW")
+        let subContext3 = await exporter.RepresentationSubContext(context, "Box", "Model", "MODEL_VIEW")
+        let subContext4 = await exporter.RepresentationSubContext(context, "Footprint", "Model", "MODEL_VIEW")
         let project = await exporter.Project(context, "web-ifc-three", "this project was exported from web-ifc-three");
+
 
         const elementsList: any = [];
         for (let i = 0; i < objects.length; i++) {

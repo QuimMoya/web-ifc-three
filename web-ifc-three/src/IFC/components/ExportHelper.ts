@@ -462,6 +462,26 @@ export class ExportHelper {
         return ref(ID);
     }
 
+    async RepresentationSubContext(context: any, identifier: string, description: string, enumerated: string)
+    {
+        let ID = EID++;
+        let pt = new wifc.IfcGeometricRepresentationSubContext(ID,
+            wifc.IFCGEOMETRICREPRESENTATIONSUBCONTEXT,
+            str(identifier),
+            str(description),
+            str("*"),
+            str("*"),
+            str("*"),
+            str("*"),
+            context,
+            empty(),
+            enm(enumerated),
+            empty(),
+        );
+        this.Write(pt);
+        return ref(ID);
+    }
+
     async UnitAssignment() {
         let ID = EID++;
         let lst: any = []
