@@ -10,7 +10,7 @@ import {
     IFCRELDEFINESBYPROPERTIES,
     IFCRELDEFINESBYTYPE, LoaderError, LoaderSettings, RawLineData, Vector
 } from 'web-ifc';
-import {ParserProgress} from "./components/IFCParser";
+import { ParserProgress } from "./components/IFCParser";
 
 export const IdAttrName = 'expressID';
 
@@ -59,6 +59,7 @@ export interface Worker {
 }
 
 export interface IfcState {
+    alignments: { [index: number]: any };
     models: { [modelID: number]: IfcModel };
     api: WebIfcAPI;
     useJSON: boolean;
@@ -150,7 +151,7 @@ export interface WebIfcAPI {
      */
     GetGeometry(modelID: number, geometryExpressID: number): IfcGeometry | Promise<IfcGeometry>;
 
-    GetLine(modelID: number, expressID: number, flatten?: boolean):  any | Promise<any>;
+    GetLine(modelID: number, expressID: number, flatten?: boolean): any | Promise<any>;
 
     GetAndClearErrors(modelID: number): Vector<LoaderError> | Promise<Vector<LoaderError>>;
 
@@ -160,7 +161,7 @@ export interface WebIfcAPI {
 
     GetRawLineData(modelID: number, expressID: number): RawLineData | Promise<RawLineData>;
 
-    WriteRawLineData(modelID: number, data: RawLineData):  any | Promise<any>;
+    WriteRawLineData(modelID: number, data: RawLineData): any | Promise<any>;
 
     GetLineIDsWithType(modelID: number, type: number): Vector<number> | Promise<Vector<number>>;
 

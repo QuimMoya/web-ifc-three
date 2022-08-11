@@ -35,6 +35,7 @@ class IFCWorker implements RootWorker {
 
     initializeAPI(api: WebIfcAPI) {
         this.state = {
+            alignments: [],
             models: [],
             api,
             useJSON: false,

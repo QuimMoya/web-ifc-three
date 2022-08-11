@@ -6,7 +6,8 @@ import {
     IFCSPACE,
     FlatMesh,
     IFCOPENINGELEMENT,
-    IFCPRODUCTDEFINITIONSHAPE
+    IFCPRODUCTDEFINITIONSHAPE,
+    IfcAlignment
 } from 'web-ifc';
 import { IfcState, IfcMesh } from '../BaseDefinitions';
 import {
@@ -21,6 +22,7 @@ import {
 import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils';
 import { BvhManager } from './BvhManager';
 import { IFCModel } from './IFCModel';
+import { Vector } from '../web-workers/serializer/Vector';
 
 export interface ParserProgress {
     loaded: number;
@@ -115,30 +117,71 @@ export class IFCParser implements ParserAPI {
     private async loadAllGeometry(modelID: number) {
         this.addOptionalCategories(modelID);
         await this.initializeLoadingState(modelID);
-
         this.state.api.StreamAllMeshes(modelID, (mesh: FlatMesh) => {
             this.updateLoadingState();
             // only during the lifetime of this function call, the geometry is available in memory
             this.streamMesh(modelID, mesh);
         });
-
         this.notifyLoadingEnded();
         const geometries: BufferGeometry[] = [];
         const materials: MeshLambertMaterial[] = [];
-
         Object.keys(this.geometriesByMaterials).forEach((key) => {
             const geometriesByMaterial = this.geometriesByMaterials[key].geometries;
             const merged = mergeBufferGeometries(geometriesByMaterial);
             materials.push(this.geometriesByMaterials[key].material);
             geometries.push(merged);
         });
+        this.loadAlignments();
+        if (geometries.length > 0) {
+            const combinedGeometry = mergeBufferGeometries(geometries, true);
+            this.cleanUpGeometryMemory(geometries);
+            if (this.BVH) this.BVH.applyThreeMeshBVH(combinedGeometry);
+            const model = new IFCModel(combinedGeometry, materials);
+            this.state.models[this.currentModelID].mesh = model;
+            return model;
+        }
+        return new IFCModel();
+    }
 
-        const combinedGeometry = mergeBufferGeometries(geometries, true);
-        this.cleanUpGeometryMemory(geometries);
-        if (this.BVH) this.BVH.applyThreeMeshBVH(combinedGeometry);
-        const model = new IFCModel(combinedGeometry, materials);
-        this.state.models[this.currentModelID].mesh = model;
-        return model;
+    private async loadAlignments() {
+        const alignments = this.state.api.wasmModule.LoadAllAlignments(this.currentModelID);
+        const num = alignments.size();
+        const aliList: any = [];
+        for (let i = 0; i < num; i++) {
+            const alignment = alignments.get(i);
+            const origin = { x: alignment.origin.x, y: alignment.origin.y, z: alignment.origin.z };
+            const numh = alignment.Horizontal.curves.size();
+            const horList: any = [];
+            for (let j = 0; j < numh; j++) {
+                const curve = alignment.Horizontal.curves.get(j);
+                const nump = curve.points.size();
+                const ptList: any = [];
+                for (let p = 0; p < nump; p++) {
+                    const pt = curve.points.get(p);
+                    const newPoint = { x: pt.x, y: pt.y };
+                    ptList.push(newPoint);
+                }
+                const newCurve = { points: ptList };
+                horList.push(newCurve);
+            }
+            const numv = alignment.Vertical.curves.size();
+            const verList: any = [];
+            for (let j = 0; j < numv; j++) {
+                const curve = alignment.Vertical.curves.get(j);
+                const nump = curve.points.size();
+                const ptList: any = [];
+                for (let p = 0; p < nump; p++) {
+                    const pt = curve.points.get(p);
+                    const newPoint = { x: pt.x, y: pt.y };
+                    ptList.push(newPoint);
+                }
+                const newCurve = { points: ptList };
+                verList.push(newCurve);
+            }
+            const align = { origin, horizontal: horList, vertical: verList };
+            aliList.push(align);
+        }
+        this.state.alignments[this.currentModelID] = aliList;
     }
 
     private async initializeLoadingState(modelID: number) {
@@ -154,7 +197,7 @@ export class IFCParser implements ParserAPI {
 
     private updateLoadingState() {
         const realCurrentItem = Math.min(this.loadingState.current++, this.loadingState.total);
-        if(realCurrentItem / this.loadingState.total >= this.loadingState.step) {
+        if (realCurrentItem / this.loadingState.total >= this.loadingState.step) {
             const currentProgress = Math.ceil(this.loadingState.total * this.loadingState.step);
             this.notifyProgress(currentProgress, this.loadingState.total);
             this.loadingState.step += 0.1;

@@ -21,6 +21,7 @@ import { IfcTypesMap } from './IfcTypesMap';
  */
 export class IFCManager {
     state: IfcState = {
+        alignments: [],
         models: [],
         api: new WebIFC.IfcAPI(),
         useJSON: false,
