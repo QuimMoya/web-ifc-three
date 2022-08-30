@@ -107785,7 +107785,7 @@ class IfcManager {
 
         await this.ifcLoader.ifcManager.applyWebIfcConfig({
             COORDINATE_TO_ORIGIN: firstModel,
-            USE_FAST_BOOLS: false
+            USE_FAST_BOOLS: true
         });
 
         const ifcModel = await this.ifcLoader.loadAsync(ifcURL);
@@ -107858,9 +107858,69 @@ class IfcManager {
                     const line = new Line(geometry, material);
                     this.scene.add(line);
                 }
+
+                let lastx = 0;
+                let lasty = 0;
+                let length = 0;
+                material = new LineBasicMaterial({ color: 0xffdd00 });
+                for (let i = 0; i < alignment.horizontal.length; i++) {
+                    const points = [];
+                    for (let j = 0; j < alignment.horizontal[i].points.length; j++) {
+                        let alt = 0;
+
+                        if (i == 0 && j == 0) {
+                            lastx = alignment.horizontal[i].points[j].x;
+                            lasty = alignment.horizontal[i].points[j].y;
+                        }
+
+                        const valueX = alignment.horizontal[i].points[j].x - lastx;
+                        const valueY = -(alignment.horizontal[i].points[j].y - lasty);
+                        lastx = alignment.horizontal[i].points[j].x;
+                        lasty = alignment.horizontal[i].points[j].y;
+                        length += Math.sqrt(valueX * valueX + valueY * valueY);
+                        let first = true;
+                        let lastAlt = 0;
+                        let lastxx = 0;
+                        let done = false;
+                        for (let ii = 0; ii < alignment.vertical.length; ii++) {
+                            for (let jj = 1; jj < alignment.vertical[ii].points.length; jj++) {
+                                if (first) {
+                                    first = false;
+                                    alt = alignment.vertical[ii].points[jj].y;
+                                }
+                                if (alignment.vertical[ii].points[jj].x >= length) {
+                                    console.log('value ', alignment.vertical[ii].points[jj].x);
+                                    console.log('length ', length);
+                                    console.log('lastxx ', lastxx);
+                                    const value1 = alignment.vertical[ii].points[jj].x - lastxx;
+                                    const value2 = length - lastxx;
+                                    const value3 = 1 - (value2 / value1);
+                                    alt = (lastAlt * value3) +
+                                        (alignment.vertical[ii].points[jj].y) * (1 - value3);
+                                    console.log('alt ', alt);
+                                    done = true;
+                                    break;
+                                }
+                                lastAlt = alignment.vertical[ii].points[jj].y;
+                                lastxx = alignment.vertical[ii].points[jj].x;
+                            }
+                            if (done) { break; }
+                        }
+                        alt -= origin.y;
+                        points.push(new Vector3(
+                            alignment.horizontal[i].points[j].x - origin.x - start.x,
+                            alt,
+                            -(alignment.horizontal[i].points[j].y - origin.z - start.z))
+                        );
+                    }
+                    console.log("3D points ", points);
+                    const geometry = new BufferGeometry().setFromPoints(points);
+                    const line = new Line(geometry, material);
+                    this.scene.add(line);
+                }
             }
         }
-        
+
         ////////////////////
 
         const stop = window.performance.now();
